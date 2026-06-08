@@ -4,7 +4,6 @@ from collections import deque
 from contextlib import redirect_stdout
 import argparse
 from tqdm import tqdm
-
 from model_definitions import initializeLLM, promptLLM, constructPrompt
 from prompts import multi_dim_prompt, NodeListSchema, type_cls_system_instruction, type_cls_main_prompt, TypeClsSchema
 from taxonomy import Node, DAG
@@ -137,7 +136,6 @@ def main(args):
 
     print("######## STEP 3: CLASSIFY PAPERS BY DIMENSION (TASK, METHOD, DATASET, EVAL, APPLICATION, etc.) ########")
 
-    args.llm = 'ollama'
     dags = {dim:DAG(root=root, dim=dim) for dim, root in roots.items()}
 
     # do for internal collection
@@ -194,7 +192,6 @@ def main(args):
         else:
             # no children -> perform depth expansion
             new_children, success = expandNodeDepth(args, curr_node, id2node, label2node)
-            args.llm = 'ollama'
             print(f'(DEPTH EXPANSION) new {len(new_children)} children for {curr_node.label} ({curr_node.dimension}) are: {str((new_children))}')
             if (len(new_children) > 0) and success:
                 queue.append(curr_node)
@@ -215,7 +212,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--topic', type=str, default='natural language processing')
     parser.add_argument('--dataset', type=str, default='llm_graph')
-    parser.add_argument('--llm', type=str, default='gpt')
+    parser.add_argument('--llm', type=str, default='ollama')
+    parser.add_argument('--ollama_model', type=str, default='gemma3:12b')
     parser.add_argument('--max_depth', type=int, default=2)
     parser.add_argument('--init_levels', type=int, default=1)
     parser.add_argument('--max_density', type=int, default=40)
