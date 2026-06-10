@@ -139,7 +139,7 @@ def main(args):
     for p_id, out in enumerate(outputs):
         internal_collection[p_id].labels = {}
         for key, val in out.items():
-            if val:
+            if val and key in args.dimensions:
                 type_dist[key].append(internal_collection[p_id])
                 internal_collection[p_id].labels[key] = []
                 roots[key].papers[p_id] = internal_collection[p_id]
@@ -199,8 +199,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--topic', type=str, default='natural language processing')
-    parser.add_argument('--dataset', type=str, default='llm_graph')
+    parser.add_argument('--topic', type=str, default='diabetes mellitus')
+    parser.add_argument('--dataset', type=str, default='slr')
     parser.add_argument('--llm', type=str, default='ollama')
     parser.add_argument('--ollama_model', type=str, default='gemma3:12b')
     parser.add_argument('--max_depth', type=int, default=2)
@@ -208,8 +208,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_density', type=int, default=40)
     args = parser.parse_args()
 
-    args.dimensions = ["tasks", "datasets", "methodologies", "evaluation_methods", "real_world_domains"]
-
+    args.dimensions = ["dm_type", "clinical_task", "patient_population", "data_modality", "clinical_outcome"]
     args.data_dir = f"datasets/{args.dataset.lower().replace(' ', '_')}"
     args.internal = f"{args.dataset}.txt"
 

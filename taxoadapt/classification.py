@@ -32,4 +32,7 @@ Your output format should be in the following JSON format:
 '''
 
 def classify_prompt(node, paper):
-    return init_classify_prompt + '\n\n' + main_classify_prompt(node, paper)
+    return [
+        {"role": "system", "content": init_classify_prompt},
+        {"role": "user", "content": main_classify_prompt(node, paper)}
+    ]
