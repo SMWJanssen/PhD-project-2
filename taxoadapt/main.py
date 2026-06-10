@@ -12,47 +12,36 @@ from paper import Paper
 from utils import clean_json_string
 
 def construct_dataset(args):
+    import json
+    from pathlib import Path
+
+    corpus_path = Path("datasets/slr_corpus.json")
+    if not corpus_path.exists():
+        raise FileNotFoundError(f"Corpus not found at {corpus_path}. Run slr_corpus.py first.")
+
+    data = json.loads(corpus_path.read_text(encoding="utf-8"))
+    papers = data["papers"]
+
     if not os.path.exists(args.data_dir):
         os.makedirs(args.data_dir)
-    split = 'train'
-    from datasets import load_dataset
-    
-    if args.dataset == 'emnlp_2024':
-        ds = load_dataset("EMNLP/EMNLP2024-papers")
-    elif args.dataset == 'emnlp_2022':
-        ds = load_dataset("TimSchopf/nlp_taxonomy_data")
-        split = 'test'
-    elif args.dataset == 'cvpr_2024':
-        ds = load_dataset("DeepNLP/CVPR-2024-Accepted-Papers")
-    elif args.dataset == 'cvpr_2020':
-        ds = load_dataset("DeepNLP/CVPR-2020-Accepted-Papers")
-    elif args.dataset == 'iclr_2024':
-        ds = load_dataset("DeepNLP/ICLR-2024-Accepted-Papers")
-    elif args.dataset == 'iclr_2021':
-        ds = load_dataset("DeepNLP/ICLR-2021-Accepted-Papers")
-    elif args.dataset == 'icra_2024':
-        ds = load_dataset("DeepNLP/ICRA-2024-Accepted-Papers")
-    else:
-        ds = load_dataset("DeepNLP/ICRA-2020-Accepted-Papers")
-    
-    
-    internal_collection = {}
 
-    with open(os.path.join(args.data_dir, 'internal.txt'), 'w') as i:
-        internal_count = 0
-        id = 0
-        for p in tqdm(ds[split]):
-            if ('title' not in p) or ('abstract' not in p):
-                continue
-            
-            temp_dict = {"Title": p['title'], "Abstract": p['abstract']}
-            formatted_dict = json.dumps(temp_dict)
-            i.write(f'{formatted_dict}\n')
-            internal_collection[id] = Paper(id, p['title'], p['abstract'], label_opts=args.dimensions, internal=True)
-            internal_count += 1
-            id += 1
-        print("Total # of Papers: ", internal_count)
-    
+    internal_collection = {}
+    internal_count = 0
+
+    for paper in papers:
+        if not paper.get("title") or not paper.get("abstract"):
+            continue
+        p = Paper(
+            paper_id=internal_count,
+            title=paper["title"],
+            abstract=paper["abstract"],
+            label_opts=args.dimensions,
+            internal=True
+        )
+        internal_collection[internal_count] = p
+        internal_count += 1
+
+    print(f"Loaded {internal_count} papers from {corpus_path}")
     return internal_collection, internal_count
 
 def initialize_DAG(args):
