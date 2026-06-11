@@ -4,7 +4,8 @@ from collections import deque
 from contextlib import redirect_stdout
 import argparse
 from tqdm import tqdm
-from model_definitions import initializeLLM, promptLLM, constructPrompt
+
+from model_definitions import initializeLLM, promptLLM, promptLLM_fast, promptLLM_fast_batched, constructPrompt
 from prompts import multi_dim_prompt, NodeListSchema, type_cls_system_instruction, type_cls_main_prompt, TypeClsSchema
 from taxonomy import Node, DAG
 from expansion import expandNodeWidth, expandNodeDepth
@@ -44,8 +45,8 @@ def construct_dataset(args):
     print(f"Loaded {internal_count} papers from {corpus_path}")
     return internal_collection, internal_count
 
+
 def initialize_DAG(args):
-    ## we want to make this a directed acyclic graph (DAG) so maintain a list of the nodes
     roots = {}
     id2node = {}
     label2node = {}
@@ -66,19 +67,17 @@ def initialize_DAG(args):
 
     queue = deque([node for id, node in id2node.items()])
 
-    # if taking long, you can probably parallelize this between the different taxonomies (expand by level)
     while queue:
         curr_node = queue.popleft()
         label = curr_node.label
         dim = curr_node.dimension
-        # expand
         system_instruction, main_prompt, json_output_format = multi_dim_prompt(curr_node)
         prompts = [constructPrompt(args, system_instruction, main_prompt + "\n\n" + json_output_format)]
+        # Step 2 uses the big model for high-quality taxonomy construction
         outputs = promptLLM(args=args, prompts=prompts, schema=NodeListSchema, max_new_tokens=3000, json_mode=True, temperature=0.01, top_p=1.0)[0]
         outputs = json.loads(clean_json_string(outputs)) if "```" in outputs else json.loads(outputs.strip())
         outputs = outputs['root_topic'] if 'root_topic' in outputs else outputs[label]
 
-        # add all children
         for key, value in outputs.items():
             mod_key = key.replace(' ', '_').lower()
             mod_full_key = mod_key + f"_{dim}"
@@ -108,13 +107,13 @@ def initialize_DAG(args):
 def main(args):
 
     print("######## STEP 1: LOAD IN DATASET ########")
-
     internal_collection, internal_count = construct_dataset(args)
-    
     print(f'Internal: {internal_count}')
 
     print("######## STEP 2: INITIALIZE DAG ########")
     args = initializeLLM(args)
+    print(f"  Big model (taxonomy):       {args.ollama_model}")
+    print(f"  Fast model (classification): {args.ollama_model_fast}")
 
     roots, id2node, label2node = initialize_DAG(args)
 
@@ -123,19 +122,19 @@ def main(args):
             with redirect_stdout(f):
                 roots[dim].display(0, indent_multiplier=5)
 
-    print("######## STEP 3: CLASSIFY PAPERS BY DIMENSION (TASK, METHOD, DATASET, EVAL, APPLICATION, etc.) ########")
+    print("######## STEP 3: CLASSIFY PAPERS BY DIMENSION ########")
+    print(f"  Using fast model: {args.ollama_model_fast}")
 
-    dags = {dim:DAG(root=root, dim=dim) for dim, root in roots.items()}
+    dags = {dim: DAG(root=root, dim=dim) for dim, root in roots.items()}
 
-    # do for internal collection
-
+    # Step 3 uses the fast small model — classification is simple yes/no
     prompts = [constructPrompt(args, type_cls_system_instruction, type_cls_main_prompt(paper)) for paper in internal_collection.values()]
-    outputs = promptLLM(args=args, prompts=prompts, schema=TypeClsSchema, max_new_tokens=500, json_mode=True, temperature=0.1, top_p=0.99)
+    outputs = promptLLM_fast_batched(args=args, prompts=prompts, schema=TypeClsSchema, max_new_tokens=2000, json_mode=True, temperature=0.1, top_p=0.99, batch_size=10)
     outputs = [json.loads(clean_json_string(c)) if "```" in c else json.loads(c.strip()) for c in outputs]
 
     for r in roots:
         roots[r].papers = {}
-    type_dist = {dim:[] for dim in args.dimensions}
+    type_dist = {dim: [] for dim in args.dimensions}
     for p_id, out in enumerate(outputs):
         internal_collection[p_id].labels = {}
         for key, val in out.items():
@@ -143,12 +142,11 @@ def main(args):
                 type_dist[key].append(internal_collection[p_id])
                 internal_collection[p_id].labels[key] = []
                 roots[key].papers[p_id] = internal_collection[p_id]
-    
-    print(str({k:len(v) for k,v in type_dist.items()}))
 
+    print(str({k: len(v) for k, v in type_dist.items()}))
 
-    # for each node, classify its papers for the children or perform depth expansion
     print("######## STEP 4: ITERATIVELY CLASSIFY & EXPAND ########")
+    print(f"  Using fast model: {args.ollama_model_fast}")
 
     visited = set()
     queue = deque([roots[r] for r in roots])
@@ -156,35 +154,31 @@ def main(args):
     while queue:
         curr_node = queue.popleft()
         print(f'VISITING {curr_node.label} ({curr_node.dimension}) AT LEVEL {curr_node.level}. WE HAVE {len(queue)} NODES LEFT IN THE QUEUE!')
-        
+
         if len(curr_node.children) > 0:
             if curr_node.id in visited:
                 continue
             visited.add(curr_node.id)
 
-            # classify
+            # Step 4 classification uses the fast model
             curr_node.classify_node(args, label2node, visited)
 
-            # sibling expansion if needed
             new_sibs = expandNodeWidth(args, curr_node, id2node, label2node)
             print(f'(WIDTH EXPANSION) new children for {curr_node.label} ({curr_node.dimension}) are: {str((new_sibs))}')
 
-            # re-classify and re-do process if necessary
             if len(new_sibs) > 0:
                 curr_node.classify_node(args, label2node, visited)
-            
-            # add children to queue if constraints are met
+
             for child_label, child_node in curr_node.children.items():
                 c_papers = label2node[child_label + f"_{curr_node.dimension}"].papers
                 if (child_node.level < args.max_depth) and (len(c_papers) > args.max_density):
                     queue.append(child_node)
         else:
-            # no children -> perform depth expansion
             new_children, success = expandNodeDepth(args, curr_node, id2node, label2node)
             print(f'(DEPTH EXPANSION) new {len(new_children)} children for {curr_node.label} ({curr_node.dimension}) are: {str((new_children))}')
             if (len(new_children) > 0) and success:
                 queue.append(curr_node)
-    
+
     print("######## STEP 5: SAVE THE TAXONOMY ########")
     for dim in args.dimensions:
         with open(f'{args.data_dir}/final_taxo_{dim}.txt', 'w') as f:
@@ -195,14 +189,13 @@ def main(args):
             json.dump(taxo_dict, f, ensure_ascii=False, indent=4)
 
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--topic', type=str, default='diabetes mellitus')
     parser.add_argument('--dataset', type=str, default='slr')
     parser.add_argument('--llm', type=str, default='ollama')
     parser.add_argument('--ollama_model', type=str, default='gemma3:12b')
+    parser.add_argument('--ollama_model_fast', type=str, default='gemma3:4b')
     parser.add_argument('--max_depth', type=int, default=2)
     parser.add_argument('--init_levels', type=int, default=1)
     parser.add_argument('--max_density', type=int, default=40)

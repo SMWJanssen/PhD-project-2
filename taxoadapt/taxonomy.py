@@ -1,7 +1,7 @@
 from collections import deque
 from enrichment import enrich_node_prompt
 from classification import classify_prompt
-from model_definitions import promptLLM
+from model_definitions import promptLLM, promptLLM_fast
 from prompts import EnrichSchema
 import json
 from utils import clean_json_string
@@ -152,7 +152,7 @@ class Node:
         for paper_id, paper in self.papers.items():
             prompts.append(classify_prompt(self, paper))
 
-        output = promptLLM(args, prompts, schema=ClassifySchema, max_new_tokens=3000)
+        output = promptLLM_fast(args, prompts, schema=ClassifySchema, max_new_tokens=3000)
         output_dict = [json.loads(clean_json_string(c)) if "```" in c else json.loads(c.strip()) for c in output]
         class_options = [c for c in self.get_children()]
         class_map = {c:0 for c in self.get_children()}
