@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on diabetic foot ulcers, specifically the use of clinical decision support systems to manage them, making 'diabetic_foot_ulcers' the most relevant class label.\",\n    \"class_labels\": [\"diabetic_foot_ulcers\"]\n}"

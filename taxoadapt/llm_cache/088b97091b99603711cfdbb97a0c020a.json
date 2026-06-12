@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on the application of AI in diabetes management across various stages, including diagnosis, treatment, and monitoring, making 'diagnosis', 'treatment_planning', 'patient_monitoring', and 'risk_prediction' relevant labels.\",\n    \"class_labels\": [\"diagnosis\", \"treatment_planning\", \"patient_monitoring\", \"risk_prediction\"]\n}"

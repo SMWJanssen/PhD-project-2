@@ -210,11 +210,11 @@ def promptLLM_fast(args, prompts, schema=None, max_new_tokens=1024, json_mode=Tr
     args.ollama_model = original_model
     return result
 
-def promptLLM_fast_batched(args, prompts, schema=None, max_new_tokens=2000, json_mode=True, temperature=0.1, top_p=0.99, batch_size=10):
+def promptLLM_fast_batched(args, prompts, schema=None, max_new_tokens=2000, json_mode=True, temperature=0.1, top_p=0.99, batch_size=5):
     """
     Batched version of promptLLM_fast — sends multiple prompts in one call.
-    Each prompt must be a list of messages [{"role":..., "content":...}].
-    Returns a list of outputs in the same order as the input prompts.
+    Uses batch_size=5 by default for reliability with small models.
+    Falls back to individual calls if batch parsing fails.
     """
     import math
 
@@ -225,17 +225,21 @@ def promptLLM_fast_batched(args, prompts, schema=None, max_new_tokens=2000, json
     for batch_idx in tqdm(range(n_batches)):
         batch = prompts[batch_idx * batch_size : (batch_idx + 1) * batch_size]
 
-        # Extract the user message content from each prompt
+        # Extract content from each prompt
         batch_contents = []
         for i, msg_list in enumerate(batch):
             user_content = next((m["content"] for m in msg_list if m["role"] == "user"), "")
             batch_contents.append(f"=== PAPER {i+1} ===\n{user_content}")
 
-        # Use the system prompt from the first item
         system_content = next((m["content"] for m in batch[0] if m["role"] == "system"), "")
 
         batch_user_content = "\n\n".join(batch_contents)
-        batch_user_content += f"\n\nYou must output a JSON array with exactly {len(batch)} objects, one per paper in order. Each object must have the same keys as if you were classifying a single paper."
+        batch_user_content += (
+            f"\n\nClassify ALL {len(batch)} papers above. "
+            f"You MUST return a JSON object with a single key 'results' containing an array of exactly {len(batch)} objects. "
+            f"Each object must have keys: dm_type, clinical_task, patient_population, data_modality, clinical_outcome (all boolean). "
+            f"Example format: {{\"results\": [{{\"dm_type\": true, \"clinical_task\": true, \"patient_population\": false, \"data_modality\": true, \"clinical_outcome\": false}}, ...]}}"
+        )
 
         batched_messages = [
             {"role": "system", "content": system_content},
@@ -245,8 +249,10 @@ def promptLLM_fast_batched(args, prompts, schema=None, max_new_tokens=2000, json
         cache_key = _cache_key(batched_messages, model_name, max_new_tokens, temperature)
         cached = _load_cache(cache_key)
 
+        batch_parsed = None
+
         if cached is not None:
-            batch_outputs = cached
+            batch_raw = cached
         else:
             try:
                 response = args.client["ollama"].chat.completions.create(
@@ -257,36 +263,54 @@ def promptLLM_fast_batched(args, prompts, schema=None, max_new_tokens=2000, json
                     temperature=temperature,
                     top_p=top_p,
                     max_tokens=max_new_tokens,
+                    timeout=60,  # 60 second timeout per batch
                 )
-                batch_outputs = response.choices[0].message.content
-                _save_cache(cache_key, batch_outputs)
+                batch_raw = response.choices[0].message.content
+                _save_cache(cache_key, batch_raw)
             except Exception as e:
-                print(f"  Batch {batch_idx+1} failed ({e}), falling back to individual calls")
-                batch_outputs = None
+                print(f"  Batch {batch_idx+1} API error ({e}), falling back to individual calls")
+                batch_raw = None
 
-        # Parse batch output — fallback to individual calls if parsing fails
-        if batch_outputs is not None:
+        # Try to parse batch response
+        if batch_raw is not None:
             try:
-                parsed = json.loads(clean_json_string(batch_outputs)) if "```" in batch_outputs else json.loads(batch_outputs.strip())
-                # Handle both {"results": [...]} and plain [...]
+                parsed = json.loads(clean_json_string(batch_raw)) if "```" in batch_raw else json.loads(batch_raw.strip())
+
+                # Handle {"results": [...]} format
                 if isinstance(parsed, dict):
-                    items = next((v for v in parsed.values() if isinstance(v, list)), None)
-                    if items is None:
-                        raise ValueError("No list found in batch response")
-                else:
-                    items = parsed
-                if len(items) == len(batch):
-                    for item in items:
-                        outputs.append(json.dumps(item))
-                    continue
-                else:
-                    print(f"  Batch {batch_idx+1}: got {len(items)} results for {len(batch)} papers, falling back")
+                    # Try common wrapper keys
+                    for key in ["results", "papers", "classifications", "items", "output"]:
+                        if key in parsed and isinstance(parsed[key], list):
+                            batch_parsed = parsed[key]
+                            break
+                    # If still not found, try any list value
+                    if batch_parsed is None:
+                        for v in parsed.values():
+                            if isinstance(v, list) and len(v) == len(batch):
+                                batch_parsed = v
+                                break
+                elif isinstance(parsed, list):
+                    batch_parsed = parsed
+
+                # Validate length
+                if batch_parsed is not None and len(batch_parsed) != len(batch):
+                    print(f"  Batch {batch_idx+1}: got {len(batch_parsed)} results for {len(batch)} papers, falling back")
+                    batch_parsed = None
+
             except Exception as e:
                 print(f"  Batch {batch_idx+1} parse error ({e}), falling back to individual calls")
+                batch_parsed = None
 
-        # Fallback: process individually
+        # Success — add batch results
+        if batch_parsed is not None:
+            for item in batch_parsed:
+                outputs.append(json.dumps(item))
+            continue
+
+        # Fallback: process each paper individually with timeout
+        print(f"  Batch {batch_idx+1}: processing {len(batch)} papers individually")
         for msg_list in batch:
-            single_key = _cache_key(msg_list, model_name, max_new_tokens, temperature)
+            single_key = _cache_key(msg_list, model_name, 500, temperature)
             single_cached = _load_cache(single_key)
             if single_cached is not None:
                 outputs.append(single_cached)
@@ -299,13 +323,14 @@ def promptLLM_fast_batched(args, prompts, schema=None, max_new_tokens=2000, json
                     response_format={"type": "json_object"},
                     temperature=temperature,
                     top_p=top_p,
-                    max_tokens=max_new_tokens,
+                    max_tokens=500,
+                    timeout=30,  # 30 second timeout per individual call
                 )
                 result = response.choices[0].message.content
                 _save_cache(single_key, result)
                 outputs.append(result)
             except Exception as e:
-                print(f"  Individual call failed: {e}")
+                print(f"  Individual call failed ({e}), using empty classification")
                 outputs.append('{"dm_type":false,"clinical_task":false,"patient_population":false,"data_modality":false,"clinical_outcome":false}')
 
     return outputs

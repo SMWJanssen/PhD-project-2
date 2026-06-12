@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on the use of machine learning models to predict blood glucose levels using various data sources, primarily related to patient management and clinical data. This aligns most closely with the concept of electronic health records and the use of data for diabetes management.\",\n    \"class_labels\": [\"electronic_health_records\"]\n}"

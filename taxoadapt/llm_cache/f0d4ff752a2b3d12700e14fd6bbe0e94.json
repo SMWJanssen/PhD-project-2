@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on using data mining and predictive techniques to support diabetes self-management, specifically predicting blood glucose levels, aligning closely with the 'diabetes_self_management' and 'ai_assisted_patient_monitoring' categories.\",\n    \"class_labels\": [\"diabetes_self_management\", \"ai_assisted_patient_monitoring\"]\n}"

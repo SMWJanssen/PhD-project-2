@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on using machine learning models to predict the risk of gestational diabetes mellitus (GDM) based on published prognostic models, aligning directly with the definition of 'risk_prediction'.\",\n    \"class_labels\": [\"risk_prediction\"]\n}"

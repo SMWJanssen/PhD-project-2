@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on wound assessment and monitoring systems specifically for diabetic foot ulcers, which falls under tracking a patient's health status and adjusting treatment as needed, making 'patient_monitoring' the most appropriate classification.\",\n    \"class_labels\": [\"patient_monitoring\"]\n}"

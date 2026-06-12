@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on using AI models to predict diabetes risk and complications based on genetic data, highlighting the need for further advancements in genomic discovery, therefore 'risk_prediction' and 'complication_detection' are appropriate labels.\",\n    \"class_labels\": [\"risk_prediction\", \"complication_detection\"]\n}"

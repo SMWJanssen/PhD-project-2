@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on using ECG and PPG signals for diabetes detection and related complications, which aligns directly with the goal of identifying the presence of diabetes and detecting complications, making 'diagnosis' and 'complication_detection' the most appropriate labels.\",\n    \"class_labels\": [\"diagnosis\", \"complication_detection\"]\n}"

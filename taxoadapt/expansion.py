@@ -52,7 +52,7 @@ def expandNodeWidth(args, node, id2node, label2node):
     all_node_labels = ", ".join(list(label2node.keys()))
 
     # FILTERING OF EXPANSION OUTPUTS
-    args.llm = 'gpt'
+    args.llm = 'ollama'
     clustered_prompt = [constructPrompt(args, width_cluster_system_instruction, width_cluster_main_prompt(freq_options, node, ancestors, all_node_labels))]
     success = False
     attempts = 0
@@ -73,7 +73,7 @@ def expandNodeWidth(args, node, id2node, label2node):
             print(str(e))
         attempts += 1
     
-    args.llm = 'vllm'
+    args.llm = 'ollama'
     
     if not success:
         print(f'FAILED WIDTH EXPANSION!')
@@ -130,7 +130,7 @@ def expandNodeDepth(args, node, id2node, label2node):
         ancestors = " -> ".join([ancestor.label for ancestor in node_ancestors])
     
     # identify potential subtopic options from list of papers
-    args.llm = 'vllm'
+    args.llm = 'ollama'
     subtopic_prompts = [constructPrompt(args, depth_system_instruction, depth_main_prompt(paper, node, ancestors)) 
                    for paper in node.papers.values()]
     subtopic_outputs = promptLLM(args=args, prompts=subtopic_prompts, schema=DepthExpansionSchema, max_new_tokens=300, json_mode=True, temperature=0.6, top_p=0.99)
@@ -150,7 +150,7 @@ def expandNodeDepth(args, node, id2node, label2node):
 
     all_node_labels = ", ".join(list(label2node.keys()))
 
-    args.llm = 'gpt'
+    args.llm = 'ollama'
 
     prompts = [constructPrompt(args, depth_cluster_system_instruction, depth_cluster_main_prompt(freq_options, node, ancestors, all_node_labels))]
 

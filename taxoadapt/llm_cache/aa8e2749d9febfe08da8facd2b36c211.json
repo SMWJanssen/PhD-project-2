@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper investigates the impact of a clinical decision support system on insulin use, directly addressing glycemic control and potentially healthcare utilization, making it a relevant topic for the 'glycemic_control' and 'healthcare_utilization' classes.\",\n    \"class_labels\": [\"glycemic_control\", \"healthcare_utilization\"]\n}"

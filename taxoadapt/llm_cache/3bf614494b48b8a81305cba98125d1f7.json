@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper is a meta-analysis evaluating the use of AI in diabetes management, focusing on prediction and monitoring aspects, making 'risk_prediction' and 'patient_monitoring' the most relevant classifications.\",\n    \"class_labels\": [\"risk_prediction\", \"patient_monitoring\"]\n}"

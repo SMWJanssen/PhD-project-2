@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on diabetic retinopathy, a microvascular complication of diabetes, and utilizes AI for its diagnosis and grading, making 'microvascular_complications' the most appropriate label.\",\n    \"class_labels\": [\"microvascular_complications\"]\n}"

@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The abstract explicitly states that the review included studies on people with any type of diabetes mellitus (DM), encompassing Type 1, Type 2, and gestational diabetes. Therefore, multiple class labels are appropriate.\",\n    \"class_labels\": [\"type_1_diabetes\", \"type_2_diabetes\", \"gestational_diabetes\"]\n}"

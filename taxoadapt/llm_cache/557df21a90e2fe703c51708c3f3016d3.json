@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on predicting hypoglycemia in Type 1 Diabetes, which directly relates to monitoring and managing blood glucose levels, a key aspect of glycemic control. Therefore, 'glycemic_control' is the most appropriate label.\",\n    \"class_labels\": [\"glycemic_control\"]\n}"

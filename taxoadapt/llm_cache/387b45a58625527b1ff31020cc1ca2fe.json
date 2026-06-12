@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on using AI/ML to analyze EHR data and identify optimal care patterns for inpatients with Type 2 Diabetes, specifically examining the impact of these patterns on healthcare outcomes, which aligns with the definition of AI-assisted patient monitoring.\",\n    \"class_labels\": [\"ai_assisted_patient_monitoring\"]\n}"

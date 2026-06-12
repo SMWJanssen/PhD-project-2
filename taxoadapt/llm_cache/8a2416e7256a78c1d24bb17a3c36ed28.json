@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The abstract explicitly states that the review included studies on people with any type of diabetes (T1D, T2D, and gestational DM), making 'patients_with_chronic_kidney_disease' the most relevant class option as diabetes is a common cause of chronic kidney disease.\",\n    \"class_labels\": [\"patients_with_chronic_kidney_disease\"]\n}"

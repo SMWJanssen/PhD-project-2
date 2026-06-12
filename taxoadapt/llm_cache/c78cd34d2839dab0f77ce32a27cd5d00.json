@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The abstract focuses on the prediction of hypoglycemia in diabetes management, which directly relates to glycemic control and the use of data-based algorithms. Therefore, both glycemic_control and healthcare_utilization are relevant.\",\n    \"class_labels\": [\"glycemic_control\", \"healthcare_utilization\"]\n}"

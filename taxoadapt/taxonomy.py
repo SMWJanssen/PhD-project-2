@@ -142,27 +142,26 @@ class Node:
         return list(unique_sentences)
     
     def classify_node(self, args, label2node, visited):
-
         for child_label, child in self.get_children().items():
             if child.id not in visited:
                 child.papers = {}
-
         # Which papers are classified to the current node?
         prompts = []
         for paper_id, paper in self.papers.items():
             prompts.append(classify_prompt(self, paper))
-
         output = promptLLM_fast(args, prompts, schema=ClassifySchema, max_new_tokens=3000)
         output_dict = [json.loads(clean_json_string(c)) if "```" in c else json.loads(c.strip()) for c in output]
         class_options = [c for c in self.get_children()]
         class_map = {c:0 for c in self.get_children()}
         class_map['unlabeled'] = 0
-
         for (paper_id, paper), out_labels in zip(self.papers.items(), output_dict):
-            if (len(out_labels['class_labels']) == 0) or ("None" in out_labels['class_labels']):
+            labels = out_labels.get('class_labels', [])
+            if not isinstance(labels, list):
+                labels = []
+            if (len(labels) == 0) or ("None" in labels):
                 class_map['unlabeled'] += 1
                 continue
-            for label in out_labels['class_labels']:
+            for label in labels:
                 full_label = label + f'_{self.dimension}'
                 if "None" in label:
                     class_map['unlabeled'] += 1

@@ -1,0 +1,1 @@
+"{\n    \"explanation\": \"The paper focuses on a systematic review of prediction algorithms for hypoglycemia in diabetic patients, utilizing real data and data-based algorithms, aligning closely with the definition of hypoglycemia_management and ai_assisted_patient_monitoring.\",\n    \"class_labels\": [\"hypoglycemia_management\", \"ai_assisted_patient_monitoring\"]\n}"
