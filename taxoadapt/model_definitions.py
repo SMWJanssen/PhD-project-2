@@ -24,7 +24,11 @@ import hashlib
 from pathlib import Path
 
 CACHE_DIR = Path("llm_cache")
-CACHE_DIR.mkdir(exist_ok=True)
+
+def set_cache_dir(path: str):
+    global CACHE_DIR
+    CACHE_DIR = Path(path)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 def _cache_key(prompt, model, max_tokens, temperature):
     """Generate a unique cache key from prompt + model settings."""

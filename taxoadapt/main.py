@@ -5,44 +5,59 @@ from contextlib import redirect_stdout
 import argparse
 from tqdm import tqdm
 
-from model_definitions import initializeLLM, promptLLM, promptLLM_fast, promptLLM_fast_batched, constructPrompt
+from model_definitions import initializeLLM, promptLLM, promptLLM_fast, promptLLM_fast_batched, constructPrompt, set_cache_dir
 from prompts import multi_dim_prompt, NodeListSchema, type_cls_system_instruction, type_cls_main_prompt, TypeClsSchema
 from taxonomy import Node, DAG
 from expansion import expandNodeWidth, expandNodeDepth
 from paper import Paper
 from utils import clean_json_string
 
+
 def construct_dataset(args):
-    import json
     from pathlib import Path
 
-    corpus_path = Path("datasets/slr_corpus.json")
-    if not corpus_path.exists():
-        raise FileNotFoundError(f"Corpus not found at {corpus_path}. Run slr_corpus.py first.")
-
-    data = json.loads(corpus_path.read_text(encoding="utf-8"))
-    papers = data["papers"]
+    # Support multiple corpus files via comma separation
+    corpus_paths = [Path(p.strip()) for p in args.corpus.split(',')]
 
     if not os.path.exists(args.data_dir):
         os.makedirs(args.data_dir)
 
     internal_collection = {}
     internal_count = 0
+    seen_titles = set()
 
-    for paper in papers:
-        if not paper.get("title") or not paper.get("abstract"):
+    for corpus_path in corpus_paths:
+        if not corpus_path.exists():
+            print(f"  Warning: corpus not found at {corpus_path}, skipping.")
             continue
-        p = Paper(
-            paper_id=internal_count,
-            title=paper["title"],
-            abstract=paper["abstract"],
-            label_opts=args.dimensions,
-            internal=True
-        )
-        internal_collection[internal_count] = p
-        internal_count += 1
 
-    print(f"Loaded {internal_count} papers from {corpus_path}")
+        data = json.loads(corpus_path.read_text(encoding="utf-8"))
+        papers = data["papers"]
+        loaded = 0
+
+        for paper in papers:
+            if not paper.get("title") or not paper.get("abstract"):
+                continue
+            # Deduplicate by title
+            title_key = paper["title"].lower().strip()
+            if title_key in seen_titles:
+                continue
+            seen_titles.add(title_key)
+
+            p = Paper(
+                paper_id=internal_count,
+                title=paper["title"],
+                abstract=paper["abstract"],
+                label_opts=args.dimensions,
+                internal=True
+            )
+            internal_collection[internal_count] = p
+            internal_count += 1
+            loaded += 1
+
+        print(f"  Loaded {loaded} papers from {corpus_path}")
+
+    print(f"  Total unique papers: {internal_count}")
     return internal_collection, internal_count
 
 
@@ -112,8 +127,10 @@ def main(args):
 
     print("######## STEP 2: INITIALIZE DAG ########")
     args = initializeLLM(args)
-    print(f"  Big model (taxonomy):       {args.ollama_model}")
+    set_cache_dir(args.cache_dir)
+    print(f"  Big model (taxonomy):        {args.ollama_model}")
     print(f"  Fast model (classification): {args.ollama_model_fast}")
+    print(f"  Cache directory:             {args.cache_dir}")
 
     roots, id2node, label2node = initialize_DAG(args)
 
@@ -129,7 +146,7 @@ def main(args):
 
     # Step 3 uses the fast small model — classification is simple yes/no
     prompts = [constructPrompt(args, type_cls_system_instruction, type_cls_main_prompt(paper)) for paper in internal_collection.values()]
-    outputs = promptLLM_fast_batched(args=args, prompts=prompts, schema=TypeClsSchema, max_new_tokens=2000, json_mode=True, temperature=0.1, top_p=0.99, batch_size=10)
+    outputs = promptLLM_fast_batched(args=args, prompts=prompts, schema=TypeClsSchema, max_new_tokens=2000, json_mode=True, temperature=0.1, top_p=0.99, batch_size=5)
     outputs = [json.loads(clean_json_string(c)) if "```" in c else json.loads(c.strip()) for c in outputs]
 
     for r in roots:
@@ -191,14 +208,16 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--topic', type=str, default='diabetes mellitus')
-    parser.add_argument('--dataset', type=str, default='slr')
-    parser.add_argument('--llm', type=str, default='ollama')
-    parser.add_argument('--ollama_model', type=str, default='gemma3:12b')
-    parser.add_argument('--ollama_model_fast', type=str, default='gemma3:4b')
-    parser.add_argument('--max_depth', type=int, default=2)
-    parser.add_argument('--init_levels', type=int, default=1)
-    parser.add_argument('--max_density', type=int, default=40)
+    parser.add_argument('--topic',            type=str, default='diabetes mellitus')
+    parser.add_argument('--dataset',          type=str, default='slr')
+    parser.add_argument('--corpus',           type=str, default='datasets/slr_corpus.json')
+    parser.add_argument('--llm',              type=str, default='ollama')
+    parser.add_argument('--ollama_model',     type=str, default='gemma3:12b')
+    parser.add_argument('--ollama_model_fast',type=str, default='gemma3:4b')
+    parser.add_argument('--cache_dir',        type=str, default='llm_cache')
+    parser.add_argument('--max_depth',        type=int, default=2)
+    parser.add_argument('--init_levels',      type=int, default=1)
+    parser.add_argument('--max_density',      type=int, default=40)
     args = parser.parse_args()
 
     args.dimensions = ["dm_type", "clinical_task", "patient_population", "data_modality", "clinical_outcome"]
