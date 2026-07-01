@@ -18,7 +18,7 @@ from pathlib import Path
 # ── Config ──────────────────────────────────────────────────────────────────
 CFG_PATH = Path.home() / ".config" / "pybliometrics.cfg"
 SEARCH_URL = "https://api.elsevier.com/content/search/scopus"
-ABSTRACT_URL = "https://api.elsevier.com/content/abstract/doi/{doi}"
+ABSTRACT_URL = "https://api.elsevier.com/content/article/doi/{doi}"
 OUTPUT_PATH = Path("datasets/scopus_corpus.json")
 QUERY = 'TITLE-ABS-KEY(diabetes AND ("artificial intelligence" OR "machine learning"))'
 
@@ -98,7 +98,7 @@ def fetch_abstract(doi: str, api_key: str) -> str | None:
     try:
         r = requests.get(url, headers=headers, timeout=30)
         if r.status_code == 200:
-            coredata = r.json().get("abstracts-retrieval-response", {}).get("coredata", {})
+            coredata = r.json().get("full-text-retrieval-response", {}).get("coredata", {})
             return coredata.get("dc:description", None)
         elif r.status_code == 404:
             return None
